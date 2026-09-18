@@ -9,6 +9,21 @@ import type {
   ConnectionTrustRequest,
 } from './rpc.ts'
 
+/**
+ * Pluggable request authentication for the Host Connection carrier. The default
+ * is {@link BrowserAuth} (launch token → signed cookie); a deployment may
+ * substitute another scheme (for example a DID-signed token) by providing its
+ * own implementation to the Connection service.
+ */
+export interface ConnectionAuthenticator {
+  /** Verify the authority-bound credential on a Host/API request. */
+  isAuthenticated(request: ConnectionTrustRequest): boolean
+  /** Authenticate one frontend index request, owning a redirect or 401. */
+  authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean
+  /** Add the fresh process token to an ordinary Web application URL. */
+  authenticatedUrl(baseUrl: string): string
+}
+
 const AUTH_RECORD_KEY = credentialKey('client-connection', 'browser-session')
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
 const SECRET_BYTES = 32
@@ -182,7 +197,7 @@ async function initializeSecret(credentials: CredentialProvider): Promise<Buffer
  * Connection loads the credential provider's signing secret during activation
  * and retains it for synchronous request authentication.
  */
-export class BrowserAuth {
+export class BrowserAuth implements ConnectionAuthenticator {
   private readonly launchToken: string
   private readonly maxAgeMilliseconds: number
 
